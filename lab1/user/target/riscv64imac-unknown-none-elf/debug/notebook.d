@@ -1,0 +1,1 @@
+/home/xsp/rcore/rCore-Tutorial/user/target/riscv64imac-unknown-none-elf/debug/notebook: /home/xsp/rcore/rCore-Tutorial/user/src/bin/notebook.rs /home/xsp/rcore/rCore-Tutorial/user/src/config.rs /home/xsp/rcore/rCore-Tutorial/user/src/console.rs /home/xsp/rcore/rCore-Tutorial/user/src/lib.rs /home/xsp/rcore/rCore-Tutorial/user/src/syscall.rs

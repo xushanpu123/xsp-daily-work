@@ -1,0 +1,1 @@
+/home/xsp/rcore/new-lab/os/target/riscv64imac-unknown-none-elf/debug/os: /home/xsp/rcore/new-lab/os/src/console.rs /home/xsp/rcore/new-lab/os/src/entry.asm /home/xsp/rcore/new-lab/os/src/main.rs /home/xsp/rcore/new-lab/os/src/panic.rs /home/xsp/rcore/new-lab/os/src/sbi.rs

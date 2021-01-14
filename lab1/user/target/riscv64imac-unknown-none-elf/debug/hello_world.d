@@ -1,0 +1,1 @@
+/home/xsp/rcore/new-lab/user/target/riscv64imac-unknown-none-elf/debug/hello_world: /home/xsp/rcore/new-lab/user/src/bin/hello_world.rs /home/xsp/rcore/new-lab/user/src/config.rs /home/xsp/rcore/new-lab/user/src/console.rs /home/xsp/rcore/new-lab/user/src/lib.rs /home/xsp/rcore/new-lab/user/src/syscall.rs
