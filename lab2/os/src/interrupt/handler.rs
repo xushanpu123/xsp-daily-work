@@ -15,6 +15,13 @@ pub fn init(){
     }
 }
 #[no_mangle]
-pub fn handle_interrupt(context:&Context,scause:Scause,stval:usize){
-      println!("ebreak!");
+pub fn handle_interrupt(context:&mut Context,scause:Scause,stval:usize){
+    match scause.cause() {
+        // 断点中断（ebreak）
+        Trap::Exception(Exception::Breakpoint) => breakpoint(context),
+        _=>{}
+    }
+}
+fn breakpoint(context:&mut Context){
+    println!("ebreak!");
 }
