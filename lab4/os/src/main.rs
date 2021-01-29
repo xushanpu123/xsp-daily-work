@@ -16,9 +16,11 @@ global_asm!(include_str!("boot/entry.asm"));
 pub extern "C" fn rust_main() -> ! {
     println!("helloworld!");
     interrupt::init();
+    println!("111");
     unsafe {
     task::test();
     }
+    println!("111");
     unsafe {
         llvm_asm!("ebreak"::::"volatile");
     }
