@@ -17,6 +17,6 @@ pub fn init(){
     set_next_timer_intr();
 }
 pub fn ticks(){
-    println!("timer interrupt!");
+    //println!("timer interrupt!");
     set_next_timer_intr();
 }

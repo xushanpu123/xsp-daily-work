@@ -1,6 +1,6 @@
 extern crate riscv;
 use riscv::register::{mtvec::TrapMode::Direct,stvec, sstatus::Sstatus, scause::{Scause,Trap,Exception,Interrupt}};
-use super::{context::Context, timer::ticks};
+use super::{trapframe::Trapframe, timer::ticks};
 #[macro_use]
 use crate::println;
 global_asm!(include_str!("./interrupt.asm"));
@@ -15,17 +15,18 @@ pub fn init(){
     }
 }
 #[no_mangle]
-pub fn handle_interrupt(context:&mut Context,scause:Scause,stval:usize){
+pub fn handle_interrupt(context:&mut Trapframe,scause:Scause,stval:usize){
     match scause.cause() {
         // 断点中断（ebreak）
         Trap::Exception(Exception::Breakpoint) => breakpoint(context),
         Trap::Interrupt(Interrupt::SupervisorTimer) => supervisor_timer(context),
-        _=>{}
+        Trap::Exception(Exception::LoadFault)  => {}//println!("Loadfault:{} {}", context.sepc ,stval),
+        _=>{}//println!("handle_interrupt {:?}", scause.cause()),
     }
 }
-fn breakpoint(context:&mut Context){
+fn breakpoint(context:&mut Trapframe){
     //println!("ebreak!");
 }
-fn supervisor_timer(context:&mut Context){
+fn supervisor_timer(context:&mut Trapframe){
     ticks();
 }
