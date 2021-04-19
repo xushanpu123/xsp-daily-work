@@ -25,7 +25,7 @@ impl Contextcontent{
         Context{addr:addr-13*8}
     }
     pub unsafe fn new_thread(self,stack_top:usize)->Thread{
-        self.load_context(stack_top);
+        self.load_context(stack_top-13*8);
         Thread{
             context:Context::new(stack_top),
             Kernalstack:stack_top
@@ -37,6 +37,7 @@ impl Context{
     #[naked]
     #[inline(never)]
     pub unsafe extern "C" fn switch(&mut self, target: &mut Context) {
+        
         llvm_asm!(include_str!("./switch.asm")::::"violate");
     }
     pub fn new(addr:usize)->Self{
