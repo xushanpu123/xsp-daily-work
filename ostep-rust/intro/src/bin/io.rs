@@ -1,13 +1,13 @@
 use std::io::{self,Write};
 use std::env::args;
-use crate::common::Spin;
+use intro::common::Spin;
 
 
 fn main() {
-  let argv = args();
+  let mut argv = args();
   let argc = argv.len();
   if argc != 2{
-  let stderr = io::stderr();
+  let mut stderr = io::stderr();
   stderr.write(b"usage: cpu <string>\n");
   }
   else{
