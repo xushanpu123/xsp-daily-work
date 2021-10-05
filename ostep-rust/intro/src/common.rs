@@ -1,8 +1,9 @@
 use std::time::{Duration,SystemTime};
-fn Spin(howlong:usize){
+pub fn Spin(howlong:usize){
    let earlier = SystemTime::now();
-   while SystemTime::now().duration_since(earlier).as_secs()< howlong as u64
+   while SystemTime::now().duration_since(earlier).unwrap().as_secs()< howlong as u64{
    continue;  
+   }
 }
 
 /*#ifndef __common_h__
