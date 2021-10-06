@@ -1,39 +1,96 @@
-
+extern crate rand;
+use std::ptr::NonNull;
+use std::env::args; 
+use std::io::{self,Write};
+use rand::prelude::*;
+//use rand_pcg::Pcg64;
 struct node_t{
     ticket:i32,
-    next:  *node_t
+    next:  Option<NonNull<node_t>>
 }
 
-fn main(){}
-/*
-int gtickets = 0;
-
-struct node_t {
-    int            tickets;
-    struct node_t *next;
-};
-
-struct node_t *head = NULL;
-
-void insert(int tickets) {
-    struct node_t *tmp = malloc(sizeof(struct node_t));
-    assert(tmp != NULL);
-    tmp->tickets = tickets;
-    tmp->next    = head;
-    head         = tmp;
-    gtickets    += tickets;
+impl node_t{
+    pub fn new(tickets:i32)->Self{
+        Self{
+          ticket:tickets,
+          next : None
+        }
+    } 
+}
+struct linklist{
+    head:Option<NonNull<node_t>>,
+    gtickets:i32
 }
 
-void print_list() {
-    struct node_t *curr = head;
-    printf("List: ");
-    while (curr) {
-	printf("[%d] ", curr->tickets);
-	curr = curr->next;
+impl linklist{
+    pub fn new()->Self{
+        linklist{
+            head : None,
+            gtickets:0
+        }
     }
-    printf("\n");
+    fn insert(&mut self,ticket:i32){
+        let mut node = node_t::new(ticket);
+        let ptr = NonNull::<node_t>::new(&mut node as *mut _);
+        if let Some(head) = self.head{
+           node.next = unsafe{(*head.as_ptr()).next};
+        }
+          self.head = ptr;
+          self.gtickets = self.gtickets + 1;
+
+    }
+}
+fn print_list(L:&linklist){
+    println!("List:");
+    let mut curr = L.head;
+    while let Some(p) = curr{
+        unsafe{
+        println!("[{}]",(*p.as_ptr()).ticket);
+        curr =  (*p.as_ptr()).next;
+        }
+    }
+}
+fn main(){
+    let mut argv = args();
+    let argc = argv.len();
+    let mut L = linklist::new();
+    if argc != 3{
+        let mut stderr = io::stderr();
+        stderr.write(b"usage: lottery <seed> <loops>\n");
+        std::process::exit(1);
+    }
+    else{
+      let seed = argv.nth(1).unwrap().parse::<i32>().unwrap();
+      let loops = argv.nth(2).unwrap().parse::<i32>().unwrap();
+      L.insert(50);
+      L.insert(100);
+      L.insert(25);
+      print_list(&L);
+    
+      for i in 0..loops{
+          let mut counter = 0;
+          let winner = rand::random::<i32>()% (L.gtickets);
+          let mut curr = L.head;
+        while let Some(p) = curr{
+        unsafe{
+        counter = counter + (*p.as_ptr()).ticket;
+        }
+        if counter > winner{
+            break;
+        }
+        unsafe{
+        curr =  (*p.as_ptr()).next;
+        }
+        /*counter = counter + current->tickets;
+	    if (counter > winner)
+		break; // found the winner
+	    current = current->next;*/
+        }
+      }
+    }
 }
 
+/*
 int
 main(int argc, char *argv[])
 {
