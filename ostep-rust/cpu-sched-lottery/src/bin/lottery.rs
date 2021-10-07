@@ -51,8 +51,8 @@ fn print_list(L:&linklist){
     }
 }
 fn main(){
-    let mut argv = args();
-    let argc = argv.len();
+    let argc = args().len();
+    //println!("{:?}",argv.nth(2));
     let mut L = linklist::new();
     if argc != 3{
         let mut stderr = io::stderr();
@@ -60,11 +60,16 @@ fn main(){
         std::process::exit(1);
     }
     else{
-      let seed = argv.nth(1).unwrap().parse::<i32>().unwrap();
-      let loops = argv.nth(2).unwrap().parse::<i32>().unwrap();
+        println!("{:?}",args().nth(1));
+        println!("{:?}",args().nth(2));
+      let seed = args().nth(1).unwrap().parse::<i32>().unwrap();
+      println!("{}",seed);
+      let loops = args().nth(2).unwrap().parse::<i32>().unwrap();
+      println!("{}",loops);
       L.insert(50);
       L.insert(100);
       L.insert(25);
+      L.insert(200);
       print_list(&L);
     
       for i in 0..loops{
@@ -86,6 +91,7 @@ fn main(){
 		break; // found the winner
 	    current = current->next;*/
         }
+        print_list(&L);
       }
     }
 }

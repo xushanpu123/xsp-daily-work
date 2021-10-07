@@ -1,3 +1,33 @@
+# 2021/10/07
+
+1、完成了case：
+
+**intro**:
+
+​	common_threads
+
+​	mem
+
+​	threads
+
+**threads-api:**
+
+​	thread_create_simple_args
+
+​	thread_create
+
+​	thread_create_with_return_args(基本完成，有一处bug)
+
+**threads-intro:**
+
+​	t0
+
+
+
+2、踩了一小时椭圆机
+
+3、参加了组会
+
 # 2021/10/06
 
 完成了case va和lottery（lottery为之前卡了很久的链表，剩下的case均为thread相关了）；

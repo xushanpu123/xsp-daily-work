@@ -1,0 +1,1 @@
+/home/xsp/文档/xsp-daily-work/ostep-rust/threads-api/target/debug/thread_create_simple_args: /home/xsp/文档/xsp-daily-work/ostep-rust/threads-api/src/bin/thread_create_simple_args.rs /home/xsp/文档/xsp-daily-work/ostep-rust/threads-api/src/lib.rs
