@@ -1,3 +1,25 @@
+# 2021/10/09
+
+1、完成了thread_create_with_return_args，deadlock，atomicity，ordering_fixed，compare-and-swap5个case；
+
+2、跑了5公里
+
+3、学习了rustbook的智能指针和thread部分。
+
+# 2021/10/08
+
+今天状态有点摸鱼，反思一下，明天争取多做点工作。
+
+今日日志：
+
+1、完成了t1.rs和compare-and-swap.rs
+
+2、上了一节算法设计与分析
+
+3、跑了5km
+
+
+
 # 2021/10/07
 
 1、完成了case：
