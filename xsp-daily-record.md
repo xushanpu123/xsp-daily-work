@@ -1,3 +1,7 @@
+# 2021/10/10
+
+完成了所有的小case
+
 # 2021/10/09
 
 1、完成了thread_create_with_return_args，deadlock，atomicity，ordering_fixed，compare-and-swap5个case；
