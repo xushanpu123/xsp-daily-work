@@ -10,7 +10,7 @@ use nix::{unistd::*,sys::wait::*};
 static mut c:pthread_cond_t = PTHREAD_COND_INITIALIZER;
 static mut m:pthread_mutex_t = PTHREAD_MUTEX_INITIALIZER;
 
-fn child(arg:*mut c_void)->*mut c_void {
+unsafe pub extern "C" fn child(arg:*mut c_void)->*mut c_void {
     println!("child: begin");
     mutex_lock(&mut m);
     println!("child: signal");

@@ -42,7 +42,7 @@ fn eat() {
     return;
 }
 
-fn philosopher(arg:*mut c_void)->*mut c_void {
+unsafe pub extern "C" fn philosopher(arg:*mut c_void)->*mut c_void {
     let args =  arg as *mut arg_t;
     let mut  p = *argshread_id;
 

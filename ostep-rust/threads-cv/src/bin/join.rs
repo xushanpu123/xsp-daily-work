@@ -10,7 +10,7 @@ let mut c:pthread_cond_t  = PTHREAD_COND_INITIALIZER;
 let mut m:pthread_mutex_t = PTHREAD_MUTEX_INITIALIZER;
 let mut  done:i32 = 0;
 
-fn child(arg:*mut  c_void) ->*mut c_void{
+unsafe pub extern "C" fn child(arg:*mut  c_void) ->*mut c_void{
     printlnn("child\n");
     nix::unistd::sleep(1);
     mutex_lock(&mut m);

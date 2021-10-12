@@ -35,7 +35,7 @@ fn do_get()->i32 {
     return tmp;
 }
 
-fn producer(arg:*mut c_void)->*mut c_void {
+unsafe pub extern "C" fn producer(arg:*mut c_void)->*mut c_void {
     for i in 0..loops {
 	mutex_lock(&mut m);            // p1
 	while num_full == max{    // p2

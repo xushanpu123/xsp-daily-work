@@ -52,7 +52,7 @@ static mut mutex:rwlock_t = rwlock_t{writelock:0,
     lock:0,
     readers:0};
 
-fn reader(arg:*mut c_void)->*mut c_void {
+unsafe pub extern "C" fn reader(arg:*mut c_void)->*mut c_void {
     let mut local:i32 = 0;
     for i in 0..read_loops {
 	rwlock_acquire_readlock(&mut mutex);
@@ -64,7 +64,7 @@ fn reader(arg:*mut c_void)->*mut c_void {
     return 0 as *mut c_void;
 }
 
-fn writer(arg:*mut c_void)->*mut c_void {
+unsafe pub extern "C" fn writer(arg:*mut c_void)->*mut c_void {
     for i in 0..write_loops{
 	rwlock_acquire_writelock(&mut mutex);
 	counter = counter + 1;
@@ -74,7 +74,7 @@ fn writer(arg:*mut c_void)->*mut c_void {
     return 0 as *mut c_void;
 }
 
-int main(int argc, char *argv[]) {
+unsafe int main(int argc, char *argv[]) {
    let mut argv = args();
     let argc = argv.len();
     if argc != 3{
@@ -85,14 +85,14 @@ int main(int argc, char *argv[]) {
     read_loops = args().nth(1).unwrap().parse::<i32>().unwrap();
     write_loops = args().nth(2).unwrap().parse::<i32>().unwrap();
     
-    rwlock_init(&mutex); 
-    pthread_t c1, c2;
-    Pthread_create(&c1, NULL, reader, NULL);
-    Pthread_create(&c2, NULL, writer, NULL);
-    Pthread_join(c1, NULL);
-    Pthread_join(c2, NULL);
-    printf("all done\n");
-    return 0;
+    rwlock_init(&mut mutex); 
+    let mut c1:pthread_t = 0; 
+    let mut c2:pthread_t = 0;
+    pthread_create(&mut c1, str::ptr::null(), reader, 0 as *mut c_void);
+    pthread_create(&c2, str::ptr::null(), writer, 0 as *mut c_void);
+    pthread_join(c1, 0 as *mut *mut c_void);
+    pthread_join(c2, 0 as *mut *mut c_void);
+    println("all done\n");
 }
     
 

@@ -7,7 +7,7 @@ use std::thread;
 use libc::*;
 sem_t s;
 
-fn child(arg:*mut c_void )->*mut c_void {
+unsafe pub extern "C" fn child(arg:*mut c_void )->*mut c_void {
     nix::unistd::sleep(2);
     println("child\n");
     sem_post(&mut s); // signal here: child is done

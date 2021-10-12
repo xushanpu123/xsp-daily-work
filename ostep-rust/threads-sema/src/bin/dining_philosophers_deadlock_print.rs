@@ -13,7 +13,7 @@ struct arg_t{
     thread_id:i32;
 } 
 
-static mut em_t forks:[i32;5] = [0;5];
+static mut sem_t forks:[i32;5] = [0;5];
 static mut print_lock:sem_t = PTHREAD_MUTEX_INITIALIZER;
 
 fn space(s:i32) {
@@ -55,7 +55,7 @@ fn eat() {
     return;
 }
 
-fn philosopher(arg:*mut c_void)->*mut c_void {
+unsafe pub extern "C" fn philosopher(arg:*mut c_void)->*mut c_void {
     let arg_t  =  arg as *mut arg_t;
 
     space(*args.thread_id); println!("{}: start", *args.thread_id); space_end();

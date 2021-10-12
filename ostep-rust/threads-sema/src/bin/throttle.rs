@@ -9,7 +9,7 @@ use nix::{unistd::*,sys::wait::*};
 
 static mut s:sem_t = 0;
 
-fn child(arg:*mut c_void)-<*mut c_void {
+unsafe pub extern "C" fn child(arg:*mut c_void)-<*mut c_void {
     sem_wait(&mut s); 
     println("child {}\n", arg as i128);
     nix::unistd::sleep(1);

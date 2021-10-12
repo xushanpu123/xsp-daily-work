@@ -35,7 +35,7 @@ fn do_get()->i32 {
     return tmp;
 }
 
-fn producer(arg:*mut c_void)->*mut c_void {
+unsafe pub extern "C" fn producer(arg:*mut c_void)->*mut c_void {
     for i in 0..loops {
 	mutex_lock(&mut m);            // p1
 	while num_full == max{    // p2
@@ -60,7 +60,7 @@ fn producer(arg:*mut c_void)->*mut c_void {
     return 0 as *mut c_void;
 }
                                                                                
-fn consumer(arg:*mut c_void)->*mut c_void {
+unsafe pub extern "C" fn consumer(arg:*mut c_void)->*mut c_void {
     let  tmp:i32 = 0;
     // consumer: keep pulling data out of shared buffer
     // until you receive a -1 (end-of-production marker)

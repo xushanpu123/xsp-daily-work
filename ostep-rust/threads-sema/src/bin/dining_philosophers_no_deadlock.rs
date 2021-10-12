@@ -1,90 +1,103 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
+extern crate libc;
+extern crate nix;
+use std::io::{self,Write};
+use std::env::args;
+use std::process::*;
+use std::thread;
+use libc::*;
 
-#include "common.h"
-#include "common_threads.h"
+use nix::{unistd::*,sys::wait::*};
 
-#ifdef linux
-#include <semaphore.h>
-#elif __APPLE__
-#include "zemaphore.h"
-#endif
+struct arg_t{
+    num_loops:i32;
+    thread_id:i32;
+} 
 
-typedef struct {
-    int num_loops;
-    int thread_id;
-} arg_t;
+static mut sem_t forks:[i32;5] = [0;5];
 
-sem_t forks[5];
+fn space(s:i32) {
+    sem_wait(&mut print_lock);
+    for i in 0..(s*10)
+	println(" ");
+}
 
-int left(int p)  {
+fn space_end() {
+    sem_post(&mut print_lock);
+}
+
+fn left(p:i32) ->i32 {
     return p;
 }
 
-int right(int p) {
+fn right(p:i32)->i32 {
     return (p + 1) % 5;
 }
 
-void get_forks(int p) {
-    if (p == 4) {
-	Sem_wait(&forks[right(p)]);
-	Sem_wait(&forks[left(p)]);
+
+
+fn get_forks(p:i32) {
+    if p == 4{
+	sem_wait(&mut forks[right(p)]);
+	sem_wait(&mut forks[left(p)]);
     } else {
-	Sem_wait(&forks[left(p)]);
-	Sem_wait(&forks[right(p)]);
+	sem_wait(&mut forks[left(p)]);
+	sem_wait(&mut forks[right(p)]);
     }
 }
 
-void put_forks(int p) {
-    Sem_post(&forks[left(p)]);
-    Sem_post(&forks[right(p)]);
+
+fn put_forks(p:i32) {
+    sem_post(&mut forks[left(p)]);
+    sem_post(&mut forks[right(p)]);
 }
 
-void think() {
+vfn think() {
     return;
 }
 
-void eat() {
+fn eat() {
     return;
 }
 
-void *philosopher(void *arg) {
-    arg_t *args = (arg_t *) arg;
-    int p = args->thread_id;
+unsafe pub extern "C" fn philosopher(arg:*mut c_void)->*mut c_void {
+    let args = arg as *mut arg_t;
 
-    int i;
-    for (i = 0; i < args->num_loops; i++) {
+    let p = *args.thread_id;
+    for 0..(*args).num_loops {
 	think();
 	get_forks(p);
 	eat();
 	put_forks(p);
     }
-    return NULL;
+    return 0 as *mut c_void;
 }
-                                                                             
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-	fprintf(stderr, "usage: dining_philosophers <num_loops>\n");
-	exit(1);
+
+fn main(){
+    let mut argv = args();
+    let argc = argv.len();
+    if argc != 1{
+    let mut stderr = io::stderr();
+    stderr.write(b"usage: dining_philosophers <num_loops>\n");
+    std::process::exit(1);
     }
-    printf("dining: started\n");
+    println!("dining: started\n");
     
-    int i;
-    for (i = 0; i < 5; i++) 
-	Sem_init(&forks[i], 1);
-
-    pthread_t p[5];
-    arg_t a[5];
-    for (i = 0; i < 5; i++) {
-	a[i].num_loops = atoi(argv[1]);
-	a[i].thread_id = i;
-	Pthread_create(&p[i], NULL, philosopher, &a[i]);
+    for i in 0..5{
+    sem_init(&mut print_lock, 1);
     }
 
-    for (i = 0; i < 5; i++) 
-	Pthread_join(p[i], NULL); 
+    let mut p:[pthread_t;5] = [0;5];
+    let mut a:[arg_t;5] = [0;5];
+    for i in 0..5{
+	a[i].num_loops = args().nth(1).unwrap().parse::<i32>().unwrap();
+	a[i].thread_id = i;
+	pthread_create(&mut p[i], std::ptr::null(), philosopher, &mut a[i]);
+    }
 
-    printf("dining: finished\n");
-    return 0;
-}
+    for i in 0..5{
+	pthread_join(p[i], 0 as *mut *mut c_void); 
+    }
+
+    println("dining: finished\n");
+}                                                                          
+
