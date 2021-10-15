@@ -1,3 +1,15 @@
+# 2021/10/15
+
+今天反思一下：上午又没能按时去实验室。
+
+跑了3km；
+
+第二章开了个头；
+
+调好了gdb的bug，详情见rcore tutorial笔记:https://github.com/xushanpu123/xsp-daily-work/blob/master/rcore%20tutorial%E7%AC%94%E8%AE%B0.md
+
+
+
 # 2021/10/14
 
 跑了一小时椭圆机；

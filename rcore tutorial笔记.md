@@ -48,7 +48,7 @@ make: *** [Makefile:60：kernel] 错误 101
 
 2、移除底层操作系统后，即在裸机上运行（个人理解是为用户程序提供系统调用）
 
-1）首先基础功能如打印和退出，已经由更底层的rustsbi写好了，我们只需要调用它的服务就可以了。
+1）首先基础功能如打印和退出，已经由更底层的rustsbi写好了，我们只需要调用它的服务就可以了。需要把rustsbi放到0x80000000的位置（需要在../bootloader/rustqemu.bin下添加rustsbi，才能正常完成指导书的命令）
 
 2）os想要运行起来，必须把其代码（即我们编译链接好的内核文件）放到rustsbi运行完毕后默认跳转到的内存位置0x80200000，这样开机后rustsbi运行后，就可以由操作系统来接管计算机。为了完成这个目标，我们借助ld文件来调整整个可执行文件的内存布局，把_start的位置放置到0x80200000，这样rustsbi一执行完就会去执行逻辑开端__start，后续的跳转和运行工作利用代码本身的内在逻辑即可顺利执行了。同时我们在ld文件中给整个可执行文件.text,.bss,.data.rodate等分配位置，并且把编译器编译好的对应的各个输入文件的段放入其中。
 
@@ -57,3 +57,26 @@ make: *** [Makefile:60：kernel] 错误 101
 4）.bss段数据必须全是0，我们分配给.bss的内存空间不一定满足这个条件，所以必须全部清零。
 
 至此，我们便可以在用户态下利用系统调用来进行打印和正确退出了
+
+
+
+**与Write有关的宏的位置**：
+
+```rust
+use core::fmt::{self,Write};
+```
+
+
+
+**关于吴一凡指导书的一个与个人实验不符合的地方**
+
+```rust
+//吴一凡指导书gdb debug方式
+cargo build --release
+
+rust-objcopy --binary-architecture=riscv64 target/riscv64gc-unknown-none-elf/release/os --strip-all -O binary target/riscv64gc-unknown-none-elf/release/os.bin
+
+qemu-system-riscv64 -machine virt -nographic -bios ../bootloader/rustsbi-qemu.bin -device loader,file=target/riscv64gc-unknown-none-elf/release/os.bin,addr=0x80200000 -S -s
+```
+
+然而无法实现debug，上网查阅资料说--release形式的cargo build无法形成gdb 的symbol，后使用cargo build使用debug目录下的可执行文件就可以正常使用gdb了。
