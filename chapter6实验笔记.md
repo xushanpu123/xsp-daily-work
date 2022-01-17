@@ -90,7 +90,7 @@ pub enum DiskInodeType {
 }
 ```
 
-DiskInode存储在inode_area区域中，一个标号对应一个拟定好的位置，inode_bitmap区域的比特位对应了这些既定位置的使用情况，某个文件一旦被初次创建，就会被分配一个inode并把自身的信息写入该inode，此后需要对这个进行的任何操作都需要访问到其对应的inode从而访问其本体。而由于inode在磁盘中的位置跟其标号一一对应，因此只需要知道其标号，就可以找到对应的DiskInode了。
+DiskInode存储在inode_area区域中，一个标号对应一个拟定好的位置，inode_bitmap区域的比特位对应了这些既定位置的使用情况，某个文件一旦被初次创建，就会被分配一个DiskInode并把自身的信息写入该DiskInode，此后需要对这个进行的任何操作都需要访问到其对应的DuskInode从而访问其本体。而由于DiskInode在磁盘中的位置跟其标号一一对应，因此只需要知道其标号，就可以找到对应的DiskInode了。
 
 
 
@@ -193,19 +193,111 @@ impl Inode {
 
 ```rust
 let block_device = Arc::clone(&efs.lock().block_device);
-//
+//efs是Arc型数据的借用，如果直接使用efs，则efs.lock()后的数据在释放前其它程序都不能访问efs，但是使用clone后，block_device是efs中数据的一个clone，因此可以独立于efs使用。
 
 ```
 
+如果获取了根目录的Inode，则根据文件名索引的步骤为:
 
+```rust
+//从根目录中找到对应文件名对应的DiskInode，遍历该DiskInode的内容，找到name相同的目录项，读取其inode_id，再根据inode_id找到对应的inode信息从而构建对应的Inode.
+impl Inode {
+    pub fn find(&self, name: &str) -> Option<Arc<Inode>> {
+        let fs = self.fs.lock();
+        self.read_disk_inode(|disk_inode|{
+            self.find_inode_id(name,disk_inode)
+            .map(|inode_id|{
+                let (block_id, block_offset) = fs.get_disk_inode_pos(inode_id);
+                Arc::new(Self::new(
+                    block_id,
+                    block_offset,
+                    self.fs.clone(),
+                    self.block_device.clone(),
+                ))
+            })
+        })
+    }
+     fn find_inode_id(     //根据文件名找到对应的inode_id
+        &self,
+        name: &str,
+        disk_inode: &DiskInode,
+    ) -> Option<u32> {
+        // assert it is a directory
+        assert!(disk_inode.is_dir());
+        let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+        let mut dirent = DirEntry::empty();
+        for i in 0..file_count {
+            assert_eq!(
+                disk_inode.read_at(
+                    DIRENT_SZ * i,
+                    dirent.as_bytes_mut(),
+                    &self.block_device,
+                ),
+                DIRENT_SZ,
+            );
+            if dirent.name() == name {
+                return Some(dirent.inode_number() as u32);
+            }
+        }
+        None
+    }
+}
+      }
+    
+```
 
+此时，为了实现进一步的功能，我们必须实现如下接口：
 
+```rust
+EasyFileSystem::get_disk_inode_pos(inode_id:Option<u32>)->(usize,usize);
+DirEntry::empty();
+DiskInode::is_dir();
+pub fn read_at(
+		&self,
+		offset: usize,
+		buf: &mut [u8],
+		block_device: &Arc<dyn BlockDevice>,
+	) -> usize 
+```
+
+但是我们设计顶层的时候，可以先假设这些接口已经实现了，等我们完成了整个顶层设计的时候，再去考虑下层的数据结构需要使用哪些接口，再一一设计即可。
+
+**语法知识：**
+
+```rust
+self.find_inode_id(name,disk_inode)
+            .map(|inode_id|{
+                let (block_id, block_offset) = fs.get_disk_inode_pos(inode_id);
+                Arc::new(Self::new(
+                    block_id,
+                    block_offset,
+                    self.fs.clone(),
+                    self.block_device.clone(),
+                ))
+            })
+
+//.map(f)方法：参数为闭包，即把调用者当成是参数，执行并返回闭包f的结果。
+```
+
+如果获取了根目录的Inode，则列出根目录下的所有的文件名的步骤为：
+
+```rust
+//找到对应的DiskInode,再找到DiskInode中指向的所有磁盘块，按顺序读出所有磁盘块中的目录项的name即可。
+impl Inode{
+    pub fn ls(&self) -> Vec<String>{
+        self.read_disk_inode(|disk_inode|{
+            
+        })
+        
+    }
+}
+```
 
 
 
 ```rust
 impl EasyFileSystem {          
-        pub fn create(  //在block_device中装入新的EasyFileSystem，主要包括根据参数创建EasyFileSystem结构，构建superblock装入          							 //	block 0，清空位图（实际操作时归零了所有磁盘块，但是个人认为清空位图部分即可），创建空的根目录
+        pub fn create(  //在block_device中装入新的EasyFileSystem，主要包括根据参数创建EasyFileSystem结构，构建superblock装入block 0，清空位图（实际操作时归零了所有磁盘块，但是个人认为清空位图部分即可），创建空的根目录
         block_device: Arc<dyn BlockDevice>,
         total_blocks: u32,
         inode_bitmap_blocks: u32,
