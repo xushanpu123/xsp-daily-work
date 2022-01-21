@@ -4,6 +4,8 @@
  [**在Patreon上支持我!**](https://www.patreon.com/sgmarz)  [**操作系统博客**](http://osblog.stephenmarz.com/)  [**RSS订阅** ](http://osblog.stephenmarz.com/feed.rss)  [**Github** ](https://github.com/sgmarz)  [**EECS网站**](http://web.eecs.utk.edu/~smarz1)
  这是[用Rust编写RISC-V操作系统](http://osblog.stephenmarz.com/index.html)系列教程中的第10章。
 
+[目录](http://osblog.stephenmarz.com/index.html) → [第9章](http://osblog.stephenmarz.com/ch9.html) → (第10章) → [第11章](http://osblog.stephenmarz.com/ch11.html)
+
 # 文件系统
 
 2020年5月4日。仅限PATREON
@@ -20,9 +22,9 @@ https://www.youtube.com/watch?v=OOyQOgHkVyI
 
 上面的说明是针对一般的文件系统的，但它确实对Minix 3文件系统进行了更详细的说明。我们在这里构建的操作系统可能会做一些不同的事情。这主要是因为它是用Rust编写的--hahahahaha。
 
-## Rust Out-of-the-Box
+## 开箱即用的Rust
 
-这个操作系统现在可以单独由 Rust 来编译了。我更新了 [Chapter 0](http://osblog.stephenmarz.com/ch0.html) f中关于配置 Rust 的程序，以便在不需要工具链的情况下编译这个操作系统!
+这个操作系统现在可以单独由 Rust 来编译了。我更新了 [Chapter 0](http://osblog.stephenmarz.com/ch0.html) 中关于配置 Rust 的程序，以便在不需要工具链的情况下编译这个操作系统!
 
 ## 概述
 
