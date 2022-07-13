@@ -32,4 +32,4 @@
 
 ## 2022/07/13
 
-完成了chapter2的代码解析工作，并已经上传笔记。
+完成了chapter2的代码解析工作，并已经上传笔记。地址：https://github.com/xushanpu123/xsp-daily-work/blob/master/%E6%9A%91%E6%9C%9Frcore%E5%AE%9E%E9%AA%8C%E7%AC%94%E8%AE%B0/chapter2%EF%BC%9A%E6%89%B9%E5%A4%84%E7%90%86%E7%B3%BB%E7%BB%9F.md。
