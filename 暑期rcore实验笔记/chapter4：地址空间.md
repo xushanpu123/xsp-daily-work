@@ -528,3 +528,974 @@ impl Drop for FrameTracker {
 
 
 
+**在三级页表结构中访问和创建虚拟页的页表项**
+
+第一个相关功能函数为 ：
+
+```rust
+ fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry>
+```
+
+它能够返回vpn所对应的PTE,若在查询过程中发现其一级页号或二级页号在对应的页表中的页表项并不valid（该上级索引还没有被分配下级页表），则为其分配下级页表以便得到对应的PTE,其基本实现如下：
+
+```rust
+impl PageTable{
+fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        let mut idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, idx) in idxs.iter_mut().enumerate() {
+            let pte = &mut ppn.get_pte_array()[*idx];
+            if i == 2 {
+                result = Some(pte);
+                break;
+            }
+            if !pte.is_valid() {
+                let frame = frame_alloc().unwrap();
+                *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
+                self.frames.push(frame);
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
+}
+```
+
+
+
+另一个类似的函数为：
+
+```rust
+fn find_pte(&self, vpn: VirtPageNum) -> Option<&PageTableEntry> 
+```
+
+其实现为：
+
+```rust
+impl PageTable{
+fn find_pte(&self, vpn: VirtPageNum) -> Option<&PageTableEntry> {
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&PageTableEntry> = None;
+        for (i, idx) in idxs.iter().enumerate() {
+            let pte = &ppn.get_pte_array()[*idx];
+            if i == 2 {
+                result = Some(pte);
+                break;
+            }
+            if !pte.is_valid() {
+                return None;
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
+}
+```
+
+实际上它的含义同样为查找vpn对应的PTE，但是如果该PTE还没有在页表中创建，则返回None。
+
+
+
+配合以下两个函数，我们可以不通过MMU而手动查询页表内容：
+
+```rust
+impl PageTable{
+pub fn from_token(satp: usize) -> Self {          
+        Self {
+            root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),
+            frames: Vec::new(),
+        }
+    }
+
+pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
+        self.find_pte(vpn).copied()
+    }
+}
+```
+
+
+
+实现了这些功能后，我们提供了两个很重要的函数：
+
+```rust
+//为页表的虚拟页vpn增加一个对应的页表项，物理页号为ppn，标记为为flags。 
+pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+        let pte = self.find_pte_create(vpn).unwrap();
+        assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
+        *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+    }
+
+//释放掉vpn对应的页表项
+    #[allow(unused)]
+    pub fn unmap(&mut self, vpn: VirtPageNum) {
+        let pte = self.find_pte_create(vpn).unwrap();
+        assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
+        *pte = PageTableEntry::empty();
+    }
+```
+
+
+
+
+
+最后，提供了一个辅助函数用来获取页表的根页表地址：
+
+```rust
+pub fn token(&self) -> usize {
+        8usize << 60 | self.root_ppn.0
+    }
+```
+
+至此，页表相关的结构和方法均已经实现，我们对能被外层调用的接口做一个总结：
+
+```rust
+impl PageTable {
+     pub fn new() -> Self；        					 //创建空页表
+     pub fn from_token(satp: usize) -> Self；         //创建根目录地址为satp的空页表
+     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags)；
+     pub fn unmap(&mut self, vpn: VirtPageNum)；
+     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry>  //获取页表项的copy
+     pub fn token(&self) -> usize                     //获取页表的satp
+}
+```
+
+
+
+#### 2、逻辑段与地址空间的构建
+
+**逻辑段的结构与方法**
+
+```rust
+/// map area structure, controls a contiguous piece of virtual memory
+pub struct MapArea {
+    vpn_range: VPNRange,                                     //迭代器，元素为所有的虚拟页            
+    data_frames: BTreeMap<VirtPageNum, FrameTracker>,        //记录映射关系
+    map_type: MapType,                                       
+    map_perm: MapPermission,                                 //逻辑段的访问权限
+}
+```
+
+逻辑段代表了一段连续的虚拟页所构成的虚拟地址空间，其中：
+
+```rust
+pub enum MapType {
+    Identical,                                       //表示对等映射
+    Framed,                                          //表示对于每个虚拟页面都需要映射到一个新分配的物理页帧
+}
+
+bitflags! {
+    pub struct MapPermission: u8 {                  //可以看到与PTEflags是同样的结构
+        const R = 1 << 1;
+        const W = 1 << 2;
+        const X = 1 << 3;
+        const U = 1 << 4;
+    }
+}
+
+```
+
+MapArea与页表映射有关的方法为：
+
+```rust
+impl MapArea {
+    
+//创建一个新的MapArea
+    pub fn new(
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        map_type: MapType,
+        map_perm: MapPermission,
+    ) -> Self {
+        let start_vpn: VirtPageNum = start_va.floor();
+        let end_vpn: VirtPageNum = end_va.ceil();
+        Self {
+            vpn_range: VPNRange::new(start_vpn, end_vpn),
+            data_frames: BTreeMap::new(),
+            map_type,
+            map_perm,
+        }
+    }
+    
+//为MapArea中的一个虚拟页映射物理页，若为恒等映射，则直接映射到vpn同号的ppn，否则重新分配一个物理页帧使之映射。映射完成后需要在页表中也完成映射操作。
+    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+        let ppn: PhysPageNum;
+        match self.map_type {
+            MapType::Identical => {
+                ppn = PhysPageNum(vpn.0);
+            }
+            MapType::Framed => {
+                let frame = frame_alloc().unwrap();
+                ppn = frame.ppn;
+                self.data_frames.insert(vpn, frame);
+            }
+        }
+        let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
+        page_table.map(vpn, ppn, pte_flags);
+    }
+    #[allow(unused)]
+
+//解除映射
+    pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+        #[allow(clippy::single_match)]
+        match self.map_type {
+            MapType::Framed => {
+                self.data_frames.remove(&vpn);
+            }
+            _ => {}
+        }
+        page_table.unmap(vpn);
+    }
+    
+//完成对MapArea中所有虚拟页的映射
+    pub fn map(&mut self, page_table: &mut PageTable) {
+        for vpn in self.vpn_range {
+            self.map_one(page_table, vpn);
+        }
+    }
+
+//解除对MapArea中所有虚拟页的映射
+    #[allow(unused)]
+    pub fn unmap(&mut self, page_table: &mut PageTable) {
+        for vpn in self.vpn_range {
+            self.unmap_one(page_table, vpn);
+        }
+    }
+}
+```
+
+
+
+在此基础上，可以实现在MapArea中存入数组数据的方法：
+
+```rust
+impl MapArea{
+/// data: start-aligned but maybe with shorter length
+    /// assume that all frames were cleared before
+    pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
+        assert_eq!(self.map_type, MapType::Framed);
+        let mut start: usize = 0;
+        let mut current_vpn = self.vpn_range.get_start();
+        let len = data.len();
+        loop {
+            let src = &data[start..len.min(start + PAGE_SIZE)];
+            let dst = &mut page_table
+                .translate(current_vpn)
+                .unwrap()
+                .ppn()
+                .get_bytes_array()[..src.len()];
+            dst.copy_from_slice(src);
+            start += PAGE_SIZE;
+            if start >= len {
+                break;
+            }
+            current_vpn.step();
+        }
+    }
+}
+```
+
+该函数将数据放入范围内的每个页中，一个页存满了则进入下一个页存放，直到全部数据存放完毕或者MapArea中的虚拟页全部被用完。
+
+至此，我们可以以此为基础完成对进程地址空间的定义。
+
+
+
+**地址空间的结构与方法**
+
+地址空间是与进程一一对应的，其结构为：
+
+```rust
+/// memory set structure, controls virtual-memory space
+pub struct MemorySet {
+    page_table: PageTable,
+    areas: Vec<MapArea>,
+}
+```
+
+它包含一个页表和一系列逻辑段，其基本方法包括：
+
+```rust
+pub fn new_bare() -> Self {                                                   //建立一个空的MemorySet
+        Self {
+            page_table: PageTable::new(),
+            areas: Vec::new(),
+        }
+    }
+    
+pub fn token(&self) -> usize {                                                //获取内置页表的satp
+        self.page_table.token()
+    }
+    
+pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {        //获取内置页表对应vpn的PTE
+        self.page_table.translate(vpn)
+    }
+```
+
+
+
+```rust
+//push方法将data写入map_area中，再将map_area插入MemorySet中
+fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
+        map_area.map(&mut self.page_table);                   //将map_area与page_table绑定并分配物理页帧
+        if let Some(data) = data {
+            map_area.copy_data(&mut self.page_table, data);
+        }
+        self.areas.push(map_area);
+    }
+
+//MemorySet中根据参数插入一个没有存放数据的Frame类型的MapArea。
+pub fn insert_framed_area(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    ) {
+        self.push(
+            MapArea::new(start_va, end_va, MapType::Framed, permission),
+            None,
+        );
+    }
+```
+
+
+
+下面介绍一个特殊的函数：
+
+```rust
+ /// Mention that trampoline is not collected by areas.
+    fn map_trampoline(&mut self) {
+        self.page_table.map(
+            VirtAddr::from(TRAMPOLINE).into(),
+            PhysAddr::from(strampoline as usize).into(),
+            PTEFlags::R | PTEFlags::X,
+        );
+    }
+```
+
+我们注意到，这里出现了两个参数TRAMPOLINE和strampoline，我们分别看一下它们的定义：
+
+```rust
+//   os/src/config.rs
+pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
+```
+
+
+
+```
+#     os/src/linker.ld
+
+.text : {
+        *(.text.entry)
+        . = ALIGN(4K);
+        strampoline = .;
+        *(.text.trampoline);
+        . = ALIGN(4K);
+        *(.text .text.*)
+    }
+    
+#    os/src/trap/trap.S
+
+ .section .text.trampoline
+    .globl __alltraps
+    .globl __restore
+    .align 2
+__alltraps:
+.......
+```
+
+可以看到，strampoline对应了__alltraps所对应的物理页的起始地址。
+
+
+
+因此，我们就可以理解该函数的含义了：
+
+```rust
+//在内置页表中将虚拟地址TRAMPOLINE所对应的虚拟页映射到__alltraps所对应的页。
+fn map_trampoline(&mut self) {
+        self.page_table.map(
+            VirtAddr::from(TRAMPOLINE).into(),
+            PhysAddr::from(strampoline as usize).into(),
+            PTEFlags::R | PTEFlags::X,
+        );
+    }
+```
+
+
+
+接下来，我们来实现内核载入时映射地址空间的函数：
+
+```rust
+pub fn new_kernel() -> Self {
+        let mut memory_set = Self::new_bare();
+        // map trampoline
+        memory_set.map_trampoline();
+        // map kernel sections
+        info!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
+        info!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
+        info!(".data [{:#x}, {:#x})", sdata as usize, edata as usize);
+        info!(
+            ".bss [{:#x}, {:#x})",
+            sbss_with_stack as usize, ebss as usize
+        );
+        info!("mapping .text section");
+        memory_set.push(
+            MapArea::new(
+                (stext as usize).into(),
+                (etext as usize).into(),
+                MapType::Identical,
+                MapPermission::R | MapPermission::X,
+            ),
+            None,
+        );
+        info!("mapping .rodata section");
+        memory_set.push(
+            MapArea::new(
+                (srodata as usize).into(),
+                (erodata as usize).into(),
+                MapType::Identical,
+                MapPermission::R,
+            ),
+            None,
+        );
+        info!("mapping .data section");
+        memory_set.push(
+            MapArea::new(
+                (sdata as usize).into(),
+                (edata as usize).into(),
+                MapType::Identical,
+                MapPermission::R | MapPermission::W,
+            ),
+            None,
+        );
+        info!("mapping .bss section");
+        memory_set.push(
+            MapArea::new(
+                (sbss_with_stack as usize).into(),
+                (ebss as usize).into(),
+                MapType::Identical,
+                MapPermission::R | MapPermission::W,
+            ),
+            None,
+        );
+        info!("mapping physical memory");
+        memory_set.push(
+            MapArea::new(
+                (ekernel as usize).into(),
+                MEMORY_END.into(),
+                MapType::Identical,
+                MapPermission::R | MapPermission::W,
+            ),
+            None,
+        );
+        memory_set
+    }
+```
+
+可以看到，内核的地址空间对应了多个恒等映射的逻辑段。
+
+
+
+下面是载入elf文件的用户态程序的地址空间建立过程：
+
+```rust
+ pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
+        let mut memory_set = Self::new_bare();
+        // map trampoline
+        memory_set.map_trampoline();
+        // map program headers of elf, with U flag
+        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+        let elf_header = elf.header;
+        let magic = elf_header.pt1.magic;
+        assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
+        let ph_count = elf_header.pt2.ph_count();
+        let mut max_end_vpn = VirtPageNum(0);
+        for i in 0..ph_count {
+            let ph = elf.program_header(i).unwrap();
+            if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
+                let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
+                let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
+                let mut map_perm = MapPermission::U;
+                let ph_flags = ph.flags();
+                if ph_flags.is_read() {
+                    map_perm |= MapPermission::R;
+                }
+                if ph_flags.is_write() {
+                    map_perm |= MapPermission::W;
+                }
+                if ph_flags.is_execute() {
+                    map_perm |= MapPermission::X;
+                }
+                let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
+                max_end_vpn = map_area.vpn_range.get_end();
+                memory_set.push(
+                    map_area,
+                    Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
+                );
+            }
+        }
+        // map user stack with U flags
+        let max_end_va: VirtAddr = max_end_vpn.into();
+        let mut user_stack_bottom: usize = max_end_va.into();
+        // guard page
+        user_stack_bottom += PAGE_SIZE;
+        let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
+        memory_set.push(
+            MapArea::new(
+                user_stack_bottom.into(),
+                user_stack_top.into(),
+                MapType::Framed,
+                MapPermission::R | MapPermission::W | MapPermission::U,
+            ),
+            None,
+        );
+        // map TrapContext
+        memory_set.push(
+            MapArea::new(
+                TRAP_CONTEXT.into(),
+                TRAMPOLINE.into(),
+                MapType::Framed,
+                MapPermission::R | MapPermission::W,
+            ),
+            None,
+        );
+        (
+            memory_set,
+            user_stack_top,
+            elf.header.pt2.entry_point() as usize,
+        )
+    }
+```
+
+返回了一个三元组(进程的MemorySet，用户栈地址，入口地址)
+
+这里对几个比较重要的部分进行分析：
+
+```rust
+//应用程序在链接的时候就已经确定了每个数据的虚拟地址，在载入系统的时候，数据在程序中的虚拟地址和在虚拟内存中的虚拟地址是一致的，这样才能够保证程序在进入虚拟内存系统后依然可以正常的运行。注意flags的设置，一定是MapPermission::U的，这样才能在用户态下执行。
+let ph_count = elf_header.pt2.ph_count();
+        let mut max_end_vpn = VirtPageNum(0);
+        for i in 0..ph_count {
+            let ph = elf.program_header(i).unwrap();
+            if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
+                let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
+                let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
+                let mut map_perm = MapPermission::U;
+                let ph_flags = ph.flags();
+                if ph_flags.is_read() {
+                    map_perm |= MapPermission::R;
+                }
+                if ph_flags.is_write() {
+                    map_perm |= MapPermission::W;
+                }
+                if ph_flags.is_execute() {
+                    map_perm |= MapPermission::X;
+                }
+                let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
+                max_end_vpn = map_area.vpn_range.get_end();
+                memory_set.push(
+                    map_area,
+                    Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
+                );
+            }
+        }
+```
+
+
+
+```rust
+// max_end_vpn是用户程序部分所占用的最后一个虚拟页，我们从它后面的一个页开始用作用户栈，需要设置MapPermission::R | MapPermission::W ||MapPermission::U
+
+        let max_end_va: VirtAddr = max_end_vpn.into();
+        let mut user_stack_bottom: usize = max_end_va.into();
+        // guard page
+        user_stack_bottom += PAGE_SIZE;
+        let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
+        memory_set.push(
+            MapArea::new(
+                user_stack_bottom.into(),
+                user_stack_top.into(),
+                MapType::Framed,
+                MapPermission::R | MapPermission::W | MapPermission::U,
+            ),
+            None,
+        );
+```
+
+
+
+```rust
+//   os/src/config.rs
+pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
+
+// os/mm/memory_set.rs
+这一步是预留了TRAMPOLINE前面的一个虚拟页来放置TRAP_CONTEXT
+        memory_set.push(
+            MapArea::new(
+                TRAP_CONTEXT.into(),
+                TRAMPOLINE.into(),
+                MapType::Framed,
+                MapPermission::R | MapPermission::W,
+            ),
+            None,
+        );
+```
+
+至此，与MemorySet相关的方法均实现了，我们用activate()函数来使其生效：
+
+```rust
+pub fn activate(&self) {
+        let satp = self.page_table.token();
+        unsafe {
+            satp::write(satp);                                    //切换页表
+            core::arch::asm!("sfence.vma");                       //刷新TLB
+        }
+    }
+```
+
+实例化一个内核的地址空间：
+
+```rust
+lazy_static! {
+    /// a memory set instance through lazy_static! managing kernel space
+    pub static ref KERNEL_SPACE: Arc<Mutex<MemorySet>> =
+        Arc::new(Mutex::new(MemorySet::new_kernel()));
+}
+
+pub fn init() {
+    .......
+    KERNEL_SPACE.lock().activate();
+}
+```
+
+
+
+#### 3、引入地址空间后的task设计
+
+​      在chapter2和chapter3中，任务想要运行必须手动将其载入特定的内存位置中，并且通过设计task的TrapContext来跳转到对应的内存位置去执行。在本章节中，task可以通过虚拟页来访问对应的内容,因此只需要在载入的时候将存放程序的位置作为参数建立task的地址空间就可以了：
+
+```rust
+///   os/src/loader.rs
+
+pub fn get_app_data(app_id: usize) -> &'static [u8] {
+    extern "C" {
+        fn _num_app();
+    }
+    let num_app_ptr = _num_app as usize as *const usize;
+    let num_app = get_num_app();
+    let app_start = unsafe { core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1) };
+    assert!(app_id < num_app);
+    unsafe {
+        core::slice::from_raw_parts(
+            app_start[app_id] as *const u8,
+            app_start[app_id + 1] - app_start[app_id],
+        )
+    }
+}
+```
+
+```rust
+/// task control block structure
+pub struct TaskControlBlock {
+    pub task_status: TaskStatus,
+    pub task_cx: TaskContext,
+    pub memory_set: MemorySet,             //增加地址空间的设置
+    pub trap_cx_ppn: PhysPageNum,          //TrapContext的在自身地址空间中的物理页帧，根据恒等映射原则，内核可以用该地址访问相应的Trapcontext
+    pub base_size: usize,                  //user_sp位置
+}
+
+impl TaskControlBlock{
+  	pub fn get_trap_cx(&self) -> &'static mut TrapContext {
+        self.trap_cx_ppn.get_mut()
+    }
+    pub fn get_user_token(&self) -> usize {
+        self.memory_set.token()
+    }
+    』
+```
+
+```rust
+
+impl TaskControlBlock{
+//根据elf_data构建TaskControlBlock
+	pub fn new(elf_data: &[u8], app_id: usize) -> Self {
+        // memory_set with elf program headers/trampoline/trap context/user stack
+        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
+        let trap_cx_ppn = memory_set
+            .translate(VirtAddr::from(TRAP_CONTEXT).into())
+            .unwrap()
+            .ppn();
+        let task_status = TaskStatus::Ready;
+        // map a kernel-stack in kernel space
+        let (kernel_stack_bottom, kernel_stack_top) = kernel_stack_position(app_id);    //获取内核堆栈地址，相关实现在os/src/config.rs
+        KERNEL_SPACE.lock().insert_framed_area(                                         //为用户程序的内核堆栈分配页帧，采用Frame模式
+            kernel_stack_bottom.into(),
+            kernel_stack_top.into(),
+            MapPermission::R | MapPermission::W,
+        );
+        let task_control_block = Self {
+            task_status,
+            task_cx: TaskContext::goto_trap_return(kernel_stack_top),
+            memory_set,
+            trap_cx_ppn,
+            base_size: user_sp,
+        };
+        // prepare TrapContext in user space
+        let trap_cx = task_control_block.get_trap_cx();
+        *trap_cx = TrapContext::app_init_context(                                       //初始化TrapContext，以便_switch
+            entry_point,
+            user_sp,
+            KERNEL_SPACE.lock().token(),
+            kernel_stack_top,
+            trap_handler as usize,
+        );
+        task_control_block
+    }
+}
+```
+
+
+
+值得注意的是，Task_Manager结构中存放TaskControlBlock的结构从本来的全局数组变更为了Vec：
+
+```rust
+struct TaskManagerInner {
+    /// task list
+    tasks: Vec<TaskControlBlock>,
+    /// id of current `Running` task
+    current_task: usize,
+}
+
+```
+
+这是因为我们给出了动态分配的策略：
+
+```rust
+// os/heap_alloc.rs
+#[global_allocator]
+/// heap allocator instance
+static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
+
+/// heap space ([u8; KERNEL_HEAP_SIZE])
+static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
+
+/// initiate heap allocator
+pub fn init_heap() {
+    unsafe {
+        HEAP_ALLOCATOR
+            .lock()
+            .init(HEAP_SPACE.as_ptr() as usize, KERNEL_HEAP_SIZE);
+    }
+}
+```
+
+其它关于task切换的方法基本上大同小异了。
+
+
+
+**中断进入与中断恢复的设计**
+
+本实验采用双页表设计，这也就意味着用户态和内核态使用不一样的地址空间。当中断发生时，计算机会做以下工作：
+
+- `sstatus` 的 `SPP` 字段会被修改为 CPU 当前的特权级（U/S）。
+- `sepc` 会被修改为 Trap 处理完成后默认会执行的下一条指令的地址。
+- `scause/stval` 分别会被修改成这次 Trap 的原因以及相关的附加信息。
+- CPU 会跳转到 `stvec` 所设置的 Trap 处理入口地址，并将当前特权级设置为 S ，然后从Trap 处理入口地址处开始执行。
+
+注意到，此时我们虽然位于内核态，但是依然处于用户进程的地址空间中，因此，我们需要把Trap处理的入口地址放入到用户地址空间中，即前面提到的：
+
+```rust
+pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize){
+	memory_set.map_trampoline();
+}
+```
+
+再设置用户程序中断的入口地址：
+
+```rust
+//  os/trap/mod.rs
+
+fn set_user_trap_entry() {
+    unsafe {
+        stvec::write(TRAMPOLINE as usize, TrapMode::Direct);
+    }
+}
+
+#[no_mangle]
+pub fn trap_handler() -> ! {
+    ......
+    trap_return();
+}
+
+pub fn trap_return() -> ! {
+    set_user_trap_entry();
+    ......
+}
+```
+
+中断处理入口处的代码：
+
+```
+_alltraps:
+    csrrw sp, sscratch, sp
+    # now sp->*TrapContext in user space, sscratch->user stack
+    # save other general purpose registers
+    sd x1, 1*8(sp)
+    # skip sp(x2), we will save it later
+    sd x3, 3*8(sp)
+    # skip tp(x4), application does not use it
+    # save x5~x31
+    .set n, 5
+    .rept 27
+        SAVE_GP %n
+        .set n, n+1
+    .endr
+    # we can use t0/t1/t2 freely, because they have been saved in TrapContext
+    csrr t0, sstatus
+    csrr t1, sepc
+    sd t0, 32*8(sp)
+    sd t1, 33*8(sp)
+    # read user stack from sscratch and save it in TrapContext
+    csrr t2, sscratch
+    sd t2, 2*8(sp)
+    # load kernel_satp into t0
+    ld t0, 34*8(sp)
+    # load trap_handler into t1
+    ld t1, 36*8(sp)
+    # move to kernel_sp
+    ld sp, 35*8(sp)
+    # switch to kernel space
+    csrw satp, t0
+    sfence.vma
+    # jump to trap_handler
+    jr t1
+```
+
+保存完现场后，TrapContext中存放了kernel_satp，trap_handler，kernel_sp，在切换到内核堆栈中后，直接做对应的切换即可。这里使用了jr指令，这是一个绝对寻址的指令，可以确保跳转到目标位置。
+
+
+
+
+
+处理完中断后，会调用trap_return()：
+
+```rust
+#[no_mangle]
+pub fn trap_return() -> ! {
+    set_user_trap_entry();
+    let trap_cx_ptr = TRAP_CONTEXT;
+    let user_satp = current_user_token();
+    extern "C" {
+        fn __alltraps();
+        fn __restore();
+    }
+    let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
+    unsafe {
+        core::arch::asm!(
+            "fence.i",
+            "jr {restore_va}",
+            restore_va = in(reg) restore_va,
+            in("a0") trap_cx_ptr,
+            in("a1") user_satp,
+            options(noreturn)
+        );
+    }
+}
+```
+
+执行上述代码，则会跳转到__restore继续执行，由于内核态和用户态下TRAMPOLINE都是一样的，所以页表切换后，这个执行过程并不会产生任何差错。
+
+下面是__restore部分：
+
+```
+__restore:
+    # a0: *TrapContext in user space(Constant); a1: user space token
+    # switch to user space
+    csrw satp, a1
+    sfence.vma
+    csrw sscratch, a0
+    mv sp, a0
+    # now sp points to TrapContext in user space, start restoring based on it
+    # restore sstatus/sepc
+    ld t0, 32*8(sp)
+    ld t1, 33*8(sp)
+    csrw sstatus, t0
+    csrw sepc, t1
+    # restore general purpose registers except x0/sp/tp
+    ld x1, 1*8(sp)
+    ld x3, 3*8(sp)
+    .set n, 5
+    .rept 27
+        LOAD_GP %n
+        .set n, n+1
+    .endr
+    # back to user stack
+    ld sp, 2*8(sp)
+    sret
+```
+
+包含了地址空间恢复和现场恢复。
+
+值得注意的是，switch模块并没有太大的变化，因为switch并不涉及地址空间的切换，当我们修改current_task的时候，__restore函数自然会把地址空间切换到next_task。至此，chapter4的框架部分解析完成。
+
+## 编程练习
+
+### 问题一：重写 sys_get_time 和 sys_task_info
+
+引入虚存机制后，原来内核的 sys_get_time 和 sys_task_info 函数实现就无效了。请你重写这个函数，恢复其正常功能。
+
+
+
+### 问题二：mmap 和 munmap 匿名映射
+
+mmap在 Linux 中主要用于在内存中映射文件， 本次实验简化它的功能，仅用于申请内存。
+
+请实现 mmap 和 munmap 系统调用，mmap 定义如下：
+
+```
+fn sys_mmap(start: usize, len: usize, port: usize) -> isize
+```
+
+- syscall ID：222
+
+- 申请长度为 len 字节的物理内存（不要求实际物理内存位置，可以随便找一块），将其映射到 start 开始的虚存，内存页属性为 port
+
+- - 参数：
+
+    start 需要映射的虚存起始地址，要求按页对齐 len 映射字节长度，可以为 0 port：第 0 位表示是否可读，第 1 位表示是否可写，第 2 位表示是否可执行。其他位无效且必须为 0
+
+- 返回值：执行成功则返回 0，错误返回 -1
+
+- - 说明：
+
+    为了简单，目标虚存区间要求按页对齐，len 可直接按页向上取整，不考虑分配失败时的页回收。
+
+- - 可能的错误：
+
+    start 没有按页大小对齐 port & !0x7 != 0 (port 其余位必须为0) port & 0x7 = 0 (这样的内存无意义) [start, start + len) 中存在已经被映射的页 物理内存不足
+
+munmap 定义如下：
+
+```
+fn sys_munmap(start: usize, len: usize) -> isize
+```
+
+- syscall ID：215
+
+- 取消到 [start, start + len) 虚存的映射
+
+- 参数和返回值请参考 mmap
+
+- - 说明：
+
+    为了简单，参数错误时不考虑内存的恢复和回收。
+
+- - 可能的错误：
+
+    [start, start + len) 中存在未被映射的虚存。
+
+tips:
+
+- 一定要注意 mmap 是的页表项，注意 riscv 页表项的格式与 port 的区别。
+- 你增加 PTE_U 了吗？

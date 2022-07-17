@@ -43,3 +43,9 @@
 ## 2020/07/16
 
 完成了chapter4代码解析的主体部分，并已经上传笔记，地址：https://github.com/xushanpu123/xsp-daily-work/blob/master/%E6%9A%91%E6%9C%9Frcore%E5%AE%9E%E9%AA%8C%E7%AC%94%E8%AE%B0/chapter4%EF%BC%9A%E5%9C%B0%E5%9D%80%E7%A9%BA%E9%97%B4.md
+
+
+
+## 2020/07/16
+
+目前ch4除了编程练习部分均已完成，今晚会继续更新，链接：https://github.com/xushanpu123/xsp-daily-work/blob/master/%E6%9A%91%E6%9C%9Frcore%E5%AE%9E%E9%AA%8C%E7%AC%94%E8%AE%B0/chapter4%EF%BC%9A%E5%9C%B0%E5%9D%80%E7%A9%BA%E9%97%B4.md
