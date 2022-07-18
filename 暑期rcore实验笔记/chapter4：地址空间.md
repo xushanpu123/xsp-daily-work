@@ -1572,10 +1572,79 @@ tips:
 fn sys_mmap(start: usize, len: usize, port: usize) -> isize
 ```
 
-具体步骤可以为：
+我们观察到，MemorySet函数有如下方法：
 
-1、构建一个对应的MapArea；
+```rust
+pub fn insert_framed_area(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    ) {
+        self.push(
+            MapArea::new(start_va, end_va, MapType::Framed, permission),
+            None,
+        );
+    }
+```
 
-2、将该MapArea push到进程的地址空间中即可。
+这个方法与我们要实现的函数的参数基本一致，因此我们把它作为主体函数，同时，不要忘了对参数进行类型检查，最终我们的实现方式如下：
 
-3、必须进行映射检查，不可重复映射。
+```rust
+impl MemorySet{
+	 pub fn mmap(&mut self,start: usize, len: usize, port: usize) -> isize{
+        let  vpnrange = VPNRange::new(VirtAddr::from(start).floor(), VirtAddr::from(start+len).ceil());
+        for vpn in vpnrange{
+            if let Some(pte) = self.page_table.find_pte(vpn){
+                if pte.is_valid(){
+                return -1;
+                }
+            }
+        }
+        let mut map_prem = MapPermission::U;
+        if (port & 1)!=0{
+            map_prem|=MapPermission::R;
+        }
+        if (port & 2)!=0{
+            map_prem|=MapPermission::W;
+        }
+        if (port & 4)!=0{
+            map_prem|=MapPermission::X;
+        }
+        println!("start_va:{:#x}~end_va:{:#x} map_perm:{:#x}",start,start+len,map_prem);
+        self.insert_framed_area(VirtAddr::from(start), VirtAddr::from(start + len), map_prem);
+        0
+
+    }
+}
+```
+
+此后，由系统调用函数直接调用当前进程的MemorySet的该方法再加上一些必要的边界检查即可。
+
+
+
+同样，我们也可以再MemorySet中加入munmap方法：
+
+```rust
+impl MemorySet{
+	pub fn munmap(&mut self,start: usize,len: usize)->isize{
+        let  vpnrange = VPNRange::new(VirtAddr::from(start).floor(), VirtAddr::from(start+len).ceil());
+        for vpn in vpnrange{
+            let pte = self.page_table.find_pte(vpn);
+            if pte.is_none() || !pte.unwrap().is_valid(){
+                return -1;
+            }
+        }
+        for vpn in vpnrange{
+            for area in &mut self.areas{
+                if vpn < area.vpn_range.get_end() && vpn >= area.vpn_range.get_start(){
+                    area.unmap_one(&mut self.page_table, vpn);
+                }
+            }
+        }
+        0
+    }
+}
+```
+
+第二个循环不仅取消了页表的映射，而且消除了对应的MapArea中对应的键值对，如此才能保证结构的一致性。
