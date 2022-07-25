@@ -603,7 +603,21 @@ pub struct ProcessControlBlockInner {
 
 
 
-**2、在sys_mutex_lock()和sys_semaphore_down()中进行银行家算法的检测**
+**2、在进程控制块中加入死锁检测需要的结构**
+
+```rust
+pub struct ProcessControlBlockInner {
+    ......
+    pub mutex_alloc: Vec<Option<usize>>,   // [mutex_id] -> tid，用来表示各个锁的分配情况
+    pub mutex_request: Vec<Option<usize>>, // [tid] -> mutex_id，用来表示各个线程对锁的请求情况
+    pub sem_avail: Vec<usize>,           // [mid] -> num，表示各个信号量的可用数量
+    pub sem_alloc: Vec<Vec<usize>>,      // [tid] -> {sid, num}，用来表示各个信号量给每个线程的分配情况
+    pub sem_request: Vec<Option<usize>>, // [tid] -> sid，表示各个线程对信号量的请求情况
+    pub deadlock_det_enabled: bool,
+}
+```
+
+**3、在sys_mutex_lock()和sys_semaphore_down()中进行银行家算法的检测**
 
 ```rust
 pub fn sys_mutex_lock(mutex_id: usize) -> isize {
@@ -713,3 +727,4 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
 }
 ```
 
+至此，chapter 8的编程实验任务便完成了。
