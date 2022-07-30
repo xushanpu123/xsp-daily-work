@@ -1348,7 +1348,7 @@ fn easy_fs_pack() -> std::io::Result<()> {
 
 ## Lab4 编程作业
 
-### 硬链接
+### 任务一：硬链接
 
 硬链接要求两个不同的目录项指向同一个文件，在我们的文件系统中也就是两个不同名称目录项指向同一个磁盘块。
 
@@ -1568,6 +1568,53 @@ impl Inode{
              });
         block_cache_sync_all();
         Some(())
+    }
+}
+```
+
+
+
+### 任务二：获取文件状态
+
+**fstat**:
+
+> - syscall ID: 80
+>
+> - 功能：获取文件状态。
+>
+> - Ｃ接口： `int fstat(int fd, struct Stat* st)`
+>
+> - Rust 接口： `fn fstat(fd: i32, st: *mut Stat) -> i32`
+>
+> - - 参数：
+>
+>     fd: 文件描述符 st: 文件状态结构体 `#[repr(C)] #[derive(Debug)] pub struct Stat {    /// 文件所在磁盘驱动器号，该实验中写死为 0 即可    pub dev: u64,    /// inode 文件所在 inode 编号    pub ino: u64,    /// 文件类型    pub mode: StatMode,    /// 硬链接数量，初始为1    pub nlink: u32,    /// 无需考虑，为了兼容性设计    pad: [u64; 7], } /// StatMode 定义： bitflags! {    pub struct StatMode: u32 {        const NULL  = 0;        /// directory        const DIR   = 0o040000;        /// ordinary regular file        const FILE  = 0o100000;    } } `
+
+
+
+#### 实验实现
+
+```rust
+pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
+    let token = current_user_token();
+    let task = current_task().unwrap();
+    let inner = task.inner_exclusive_access();
+
+    let va = VirtAddr::from(st as usize);
+    let pa = usize::from(PhysAddr::from(
+        inner.memory_set.translate(va.floor()).unwrap().ppn(),
+    ));
+    let st = (pa + va.page_offset()) as *mut Stat;
+    let st = unsafe { &mut *st };
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    if let Some(file) = &inner.fd_table[fd] {
+        let file = file.clone();
+        drop(inner);
+        file.stat(st)
+    } else {
+        -1
     }
 }
 ```
