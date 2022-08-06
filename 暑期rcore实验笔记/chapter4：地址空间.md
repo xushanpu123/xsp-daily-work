@@ -1447,13 +1447,75 @@ __restore:
 
 
 
+#### 需要重写的原因
+
+以sys_get_time为例，它的实现为：
+
+```rust
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
+    let us = get_time_us();
+    unsafe {
+        *ts = TimeVal {
+            sec: us / 1_000_000,
+            usec: us % 1_000_000,
+        };
+    }
+    0
+}
+```
+
+它传入的是一个TimeVal类型的指针，发起系统调用时是在用户态下传入的地址，在内核态下，该地址显然不再是传入的数据的位置，因此，我们只需要找到真实的地址位置即可。因此，我们只需要实现一个当前进程虚拟地址到物理地址的转换方法即可,一种实现方式为：
+
+```rust
+pub fn translated_physical_address(token: usize, ptr: *const u8) -> usize{
+    let page_table = PageTable::from_token(token);
+    let mut va = VirtAddr::from(ptr as usize);
+    let ppn = page_table.find_pte(va.floor()).unwrap().ppn();
+    super::PhysAddr::from(ppn).0 + va.page_offset()
+
+}
+```
+
+由此，可以得到答案方法：
+
+```rust
+pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+    let _us = get_time_us();
+    let ts = current_translated_physical_address(_ts as *const u8 ) as *mut TimeVal;
+    unsafe {
+         *ts = TimeVal {
+             sec: _us / 1_000_000,
+            usec: _us % 1_000_000,
+        };
+     }
+    0
+}
+```
+
+```rust
+pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
+    let _ti =  current_translated_physical_address(ti as *const u8 ) as *mut TaskInfo;
+    unsafe{
+    *_ti = TaskInfo{
+        status:get_current_status(),
+        syscall_times:get_syscall_times(),
+        time : (get_time_us() - get_current_start_time())/1000
+
+    };
+}
+    0
+}
+```
+
+
+
 ### 问题二：mmap 和 munmap 匿名映射
 
 mmap在 Linux 中主要用于在内存中映射文件， 本次实验简化它的功能，仅用于申请内存。
 
 请实现 mmap 和 munmap 系统调用，mmap 定义如下：
 
-```
+```rust
 fn sys_mmap(start: usize, len: usize, port: usize) -> isize
 ```
 
@@ -1477,7 +1539,7 @@ fn sys_mmap(start: usize, len: usize, port: usize) -> isize
 
 munmap 定义如下：
 
-```
+```rust
 fn sys_munmap(start: usize, len: usize) -> isize
 ```
 
@@ -1497,5 +1559,23 @@ fn sys_munmap(start: usize, len: usize) -> isize
 
 tips:
 
-- 一定要注意 mmap 是的页表项，注意 riscv 页表项的格式与 port 的区别。
+- 一定要注意 mmap 时的页表项，注意 riscv 页表项的格式与 port 的区别。
 - 你增加 PTE_U 了吗？
+
+
+
+#### 增加映射函数
+
+映射函数的定义为：
+
+```rust
+fn sys_mmap(start: usize, len: usize, port: usize) -> isize
+```
+
+具体步骤可以为：
+
+1、构建一个对应的MapArea；
+
+2、将该MapArea push到进程的地址空间中即可。
+
+3、必须进行映射检查，不可重复映射。
