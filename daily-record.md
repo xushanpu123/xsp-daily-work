@@ -8,7 +8,11 @@
 
 ## 2023/06/03
 
-对照赵博栋提供的链接：https://xz.aliyun.com/t/12424，学习了一下syskaller的sys_manager的运行原理。
+对照赵博栋提供的链接：
+
+https://xz.aliyun.com/t/12424
+
+,学习了一下syskaller的sys_manager的运行原理。
 
 
 
