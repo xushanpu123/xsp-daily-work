@@ -12,3 +12,78 @@
 
 ​	分析了一下syz_manager，配置了my.cfg的目标os和架构，修改了instance.Copy的代码来适配ByteOS，但是目前还是没能自启动ByteOS，明天继续尝试。
 
+## 2024/04/11
+
+​	继续分析syz_manager，manager复制文件到qemu虚拟机中的命令为：
+
+```go
+//   syzkaller/vm/qemu/qemu.go
+func (inst *instance) Copy(hostSrc string) (string, error) {
+...
+_, err := osutil.RunCmd(10*time.Minute*inst.timeouts.Scale, "", "scp", args...)
+...
+}
+```
+
+​	在创建虚拟机实例的时候，发现使用了长管道进行了主机和VM的通信：
+
+```go
+inst.rpipe, inst.wpipe, err = osutil.LongPipe()
+```
+
+​	对此机制，暂时没研究，chatgpt的解释如下：
+
+```
+在一般情况下，虚拟机和主机之间是无法直接使用管道进行通信的。虚拟机通常是由虚拟化软件（如 VirtualBox、VMware、QEMU 等）创建的，它们提供了虚拟机和主机之间的虚拟化接口，通过这个接口可以实现虚拟机和主机之间的通信。
+
+然而，在某些情况下，可以通过一些特殊的技术来实现虚拟机和主机之间的通信，比如 QEMU 的用户模式网络堆栈（user-mode networking stack）。这种技术可以将虚拟机中的网络流量转发到主机上，从而实现虚拟机和主机之间的通信。但这种方式并不是使用管道直接通信，而是通过网络协议来进行通信的。
+
+在代码中所提到的长管道（LongPipe）可能是一种特殊的技术，用于模拟虚拟机和主机之间的通信。但具体实现细节需要参考代码的其他部分来确定。
+```
+
+​	所以目前猜测是做了一层封装，本质还是网络通信。
+
+​	启动qemu的方案代码是：
+
+```go
+	qemu := osutil.Command(inst.cfg.Qemu, args...)
+	qemu.Stdout = inst.wpipe
+	qemu.Stderr = inst.wpipe
+	if err := qemu.Start(); err != nil {
+		return fmt.Errorf("failed to start %v %+v: %v", inst.cfg.Qemu, args, err)
+	}
+```
+
+​	因此如果想用syz_excutor启动ByteOS也是类似的。
+
+​	syz_manager启动fuzzer的命令代码是：
+
+```go
+	args := &instance.FuzzerCmdArgs{
+		Fuzzer:    fuzzerBin,
+		Executor:  executorBin,
+		Name:      instanceName,
+		OS:        mgr.cfg.TargetOS,
+		Arch:      mgr.cfg.TargetArch,
+		FwdAddr:   fwdAddr,
+		Sandbox:   mgr.cfg.Sandbox,
+		Procs:     procs,
+		Verbosity: fuzzerV,
+		Cover:     mgr.cfg.Cover,
+		Debug:     *flagDebug,
+		Test:      false,
+		Runtest:   false,
+		Optional: &instance.OptionalFuzzerArgs{
+			Slowdown:   mgr.cfg.Timeouts.Slowdown,
+			RawCover:   mgr.cfg.RawCover,
+			SandboxArg: mgr.cfg.SandboxArg,
+		},
+	}
+	cmd := instance.FuzzerCmd(args)
+	outc, errc, err := inst.Run(mgr.cfg.Timeouts.VMRunningTime, mgr.vmStop, cmd)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to run fuzzer: %v", err)
+	}
+```
+
+​	
