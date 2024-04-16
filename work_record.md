@@ -1,6 +1,8 @@
 ## 2024/04/16
 
-分离了starry的crates axerror，分离后代码位于https://github.com/xushanpu123/Starr，分离出的crates位于https://github.com/Arceos-crates/axerrno
+分离了starry的crates axerror，axio，driver_pci,分离后代码位于https://github.com/xushanpu123/Starry，分离出的crates位于https://github.com/Arceos-crates 下的对应同名仓库
+
+
 
 ## 2024/04/15
 
