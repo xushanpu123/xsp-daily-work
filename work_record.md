@@ -1,16 +1,28 @@
-## **2024/04/09**
+## 2024/04/16
 
-​    在alpine linux上编译了syzkaller，重新捋了一下syzkaller在linux宿主机和linux vm中跑的流程，晚上尝试改一下syz-manager让它能控制skzkaller在byteOS上生成测例并执行一下测例。
+分离了starry的crates axerror，分离后代码位于https://github.com/xushanpu123/Starr，分离出的crates位于https://github.com/Arceos-crates/axerrno
 
+## 2024/04/15
 
+分离crates后的starry仓库：https://github.com/xushanpu123/Starry
 
-## 2024/04/10
+分离出的crates的organization：https://github.com/Arceos-crates
 
-​	否决了4月9号的方案，准备修改syz_manager的配置来自动fuzzing ByteOS，目前看需要修改target os的编译器到musl-gcc，需要修改fuzzing内核路径的相关配置。
+初步确定了后续的工作是分离一些starry和ByteOS中的crates。
 
-​	截止中午，成功利用syzkaller自带的makefile编译成功了需要的x86-musl-linux的syz-fuzzer，syz-excutor，syz-execprog和syz-stress，其中除了syz-excutor都是go源程序编译的，syz-excutor是C++写的，需要将对应的编译器修改了musl的。下午继续修改syz_manager将这几个程序放到ByteOS里面跑一下。
+## 2024/04/14
 
-​	分析了一下syz_manager，配置了my.cfg的目标os和架构，修改了instance.Copy的代码来适配ByteOS，但是目前还是没能自启动ByteOS，明天继续尝试。
+​	主干代码全部学习完毕，跟杨金博商量了一下，明天做一下excutor的模块拆分
+
+## 2024/04/13
+
+​	继续分析文件系统模块，基本研究清楚了ByteOS的目录系统的设计方式，理清了一个应用程序依据文件路径获取文件访问的FCB或找到对应设备结构的方式。明天准备完结文件系统模块并且继续研究内存模块和task模块。
+
+## 2024/04/12
+
+​	在杨金博的要求下分析了ByteOS的文件系统模块：
+
+​	分析了vfs文件系统挂载的代码，分析了FAT32，devfs，procfs和Ramfs的逻辑初始化过程和FAT32、Ramfs转化用户访问文件的地址到磁盘块地址的流程。
 
 ## 2024/04/11
 
@@ -86,23 +98,14 @@ inst.rpipe, inst.wpipe, err = osutil.LongPipe()
 	}
 ```
 
-## 2024/04/12
+## 2024/04/10
 
-​	在杨金博的要求下分析了ByteOS的文件系统模块：
+​	否决了4月9号的方案，准备修改syz_manager的配置来自动fuzzing ByteOS，目前看需要修改target os的编译器到musl-gcc，需要修改fuzzing内核路径的相关配置。
 
-​	分析了vfs文件系统挂载的代码，分析了FAT32，devfs，procfs和Ramfs的逻辑初始化过程和FAT32、Ramfs转化用户访问文件的地址到磁盘块地址的流程。
+​	截止中午，成功利用syzkaller自带的makefile编译成功了需要的x86-musl-linux的syz-fuzzer，syz-excutor，syz-execprog和syz-stress，其中除了syz-excutor都是go源程序编译的，syz-excutor是C++写的，需要将对应的编译器修改了musl的。下午继续修改syz_manager将这几个程序放到ByteOS里面跑一下。
 
-## 2024/04/13
+​	分析了一下syz_manager，配置了my.cfg的目标os和架构，修改了instance.Copy的代码来适配ByteOS，但是目前还是没能自启动ByteOS，明天继续尝试。
 
-​	继续分析文件系统模块，基本研究清楚了ByteOS的目录系统的设计方式，理清了一个应用程序依据文件路径获取文件访问的FCB或找到对应设备结构的方式。明天准备完结文件系统模块并且继续研究内存模块和task模块。
+## **2024/04/09**
 
-
-
-# 2024/04/14
-
-​	主干代码全部学习完毕，跟杨金博商量
-
-了一下，明天做一下excutor的模块拆分
-
-
-
+​    在alpine linux上编译了syzkaller，重新捋了一下syzkaller在linux宿主机和linux vm中跑的流程，晚上尝试改一下syz-manager让它能控制skzkaller在byteOS上生成测例并执行一下测例。
