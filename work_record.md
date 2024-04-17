@@ -1,8 +1,63 @@
 ## 2024/04/17
 
-分离了driver_net,driver_display,driver_virtio,slab_allocator,allocator,axfs_vfs,memory_addr ,kernel_guard,spinlock,page_table_entry ,axlog,crate_interface,axalloc
+分离了driver_net,driver_display,driver_virtio,slab_allocator,allocator,axfs_vfs,memory_addr ,kernel_guard,spinlock,page_table_entry ,axlog,crate_interface,axalloc,lazy_init
 
 尝试拆axconfig失败了，疑似build.rs中包含路径依赖。
+
+下面是crates和modules目录下已完成拆分和尚未完成拆分的crates的统计，其中已完成19个，未完成的有24个：
+
+| Crate 名称       | 是否完成 |
+| ---------------- | -------- |
+| axerror          | ✓        |
+| axio             | ✓        |
+| driver_pci       | ✓        |
+| driver_common    | ✓        |
+| driver_block     | ✓        |
+| driver_net       | ✓        |
+| driver_display   | ✓        |
+| driver_virtio    | ✓        |
+| slab_allocator   | ✓        |
+| allocator        | ✓        |
+| axfs_vfs         | ✓        |
+| memory_addr      | ✓        |
+| kernel_guard     | ✓        |
+| spinlock         | ✓        |
+| page_table_entry | ✓        |
+| axlog            | ✓        |
+| crate_interface  | ✓        |
+| axalloc          | ✓        |
+| lazy_init        | ✓        |
+| arm_gic          | ✘        |
+| arm_pl011        | ✘        |
+| axfs_devfs       | ✘        |
+| axfs_ramfs       | ✘        |
+| capability       | ✘        |
+| dw_apb_uart      | ✘        |
+| flatten_objects  | ✘        |
+| handler_table    | ✘        |
+| linked_list      | ✘        |
+| of               | ✘        |
+| page_table       | ✘        |
+| percpu           | ✘        |
+| percpu_macros    | ✘        |
+| ratio            | ✘        |
+| scheduler        | ✘        |
+| timer_list       | ✘        |
+| tuple_for_each   | ✘        |
+| axconfig         | ✘        |
+| axdisplay        | ✘        |
+| axdriver         | ✘        |
+| axfs             | ✘        |
+| axhal            | ✘        |
+| axmem            | ✘        |
+| axnet            | ✘        |
+| axprocess        | ✘        |
+| axruntime        | ✘        |
+| axsignal         | ✘        |
+| axsync           | ✘        |
+| axtask           | ✘        |
+
+
 
 ## 2024/04/16
 
