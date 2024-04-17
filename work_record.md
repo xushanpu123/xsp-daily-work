@@ -1,3 +1,9 @@
+## 2024/04/17
+
+分离了driver_net,driver_display,driver_virtio,slab_allocator,allocator,axfs_vfs,memory_addr ,kernel_guard,spinlock,page_table_entry ,axlog,crate_interface,axalloc
+
+尝试拆axconfig失败了，疑似build.rs中包含路径依赖。
+
 ## 2024/04/16
 
 分离了starry的crates axerror，axio，driver_pci,driver_common,driver_block分离后代码位于https://github.com/xushanpu123/Starry，分离出的crates位于https://github.com/Arceos-crates 下的对应同名仓库
