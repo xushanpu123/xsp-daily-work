@@ -1,6 +1,6 @@
 ## 2024/04/17
 
-分离了linked_list，axfs_ramfs，scheduler，arm_gic，arm_pl011，axfs_devfs，capability，dw_apb_uart，flatten_objects,of，timer_list，tuple_for_each
+分离了linked_list，axfs_ramfs，scheduler，arm_gic，arm_pl011，axfs_devfs，capability，dw_apb_uart，flatten_objects,of，timer_list，tuple_for_each，至此crates目录下的crates全部分离完毕，剩下的都与axconfig有关，开始修axconfig。
 
 目前进度：
 
