@@ -1,4 +1,71 @@
-## 2024/04/17
+## 2024/04/21
+
+完成了所有模块的拆分，只留下helloworld作为初始启动的模块。
+
+starry链接：https://github.com/xushanpu123/Starry
+
+分离出的crate链接：https://github.com/Arceos-crates
+
+## 2024/04/20
+
+研究拆分含有路径依赖的build.rs的crate如何拆分，没解决。
+
+## 2024/04/19
+
+分离了除包含build.rs的crates和modules下的所有的crates：
+
+| Crate 名称                                     | 是否完成 |
+| ---------------------------------------------- | -------- |
+| axerror                                        | ✓        |
+| axio                                           | ✓        |
+| driver_pci                                     | ✓        |
+| driver_common                                  | ✓        |
+| driver_block                                   | ✓        |
+| driver_net                                     | ✓        |
+| driver_display                                 | ✓        |
+| driver_virtio                                  | ✓        |
+| slab_allocator                                 | ✓        |
+| allocator                                      | ✓        |
+| axfs_vfs                                       | ✓        |
+| memory_addr                                    | ✓        |
+| kernel_guard                                   | ✓        |
+| spinlock                                       | ✓        |
+| page_table_entry                               | ✓        |
+| axlog                                          | ✓        |
+| crate_interface                                | ✓        |
+| axallochttps://github.com/xushanpu123/Starry   | ✓        |
+| lazy_init                                      | ✓        |
+| arm_gic                                        | √        |
+| arm_pl011                                      | √        |
+| axfs_devfs                                     | √        |
+| axfs_ramfs                                     | √        |
+| capability                                     | √        |
+| dw_apb_uart                                    | √        |
+| flatten_objects                                | √        |
+| handler_table                                  | √        |
+| linked_list                                    | √        |
+| of                                             | √        |
+| page_table                                     | √        |
+| percpu                                         | √        |
+| percpu_macros                                  | √        |
+| ratio                                          | √        |
+| scheduler                                      | √        |
+| timer_list                                     | √        |
+| tuple_for_each                                 | √        |
+| axconfig                                       | ✘        |
+| axdisplay                                      | √        |
+| axdriver                                       | ✘        |
+| axfs                                           | √        |
+| axhal                                          | √        |
+| axmem                                          | √        |
+| axnet                                          | √        |
+| axprocesshttps://github.com/xushanpu123/Starry | √        |
+| axruntime                                      | √        |
+| axsignal                                       | √        |
+| axsync                                         | √        |
+| axtask                                         | √        |
+
+## 2024/04/18
 
 分离了linked_list，axfs_ramfs，scheduler，arm_gic，arm_pl011，axfs_devfs，capability，dw_apb_uart，flatten_objects,of，timer_list，tuple_for_each，至此crates目录下的crates全部分离完毕，剩下的都与axconfig有关，开始修axconfig。
 
@@ -6,56 +73,56 @@
 
 
 
-| Crate 名称       | 是否完成 |
-| ---------------- | -------- |
-| axerror          | ✓        |
-| axio             | ✓        |
-| driver_pci       | ✓        |
-| driver_common    | ✓        |
-| driver_block     | ✓        |
-| driver_net       | ✓        |
-| driver_display   | ✓        |
-| driver_virtio    | ✓        |
-| slab_allocator   | ✓        |
-| allocator        | ✓        |
-| axfs_vfs         | ✓        |
-| memory_addr      | ✓        |
-| kernel_guard     | ✓        |
-| spinlock         | ✓        |
-| page_table_entry | ✓        |
-| axlog            | ✓        |
-| crate_interface  | ✓        |
-| axalloc          | ✓        |
-| lazy_init        | ✓        |
-| arm_gic          | √        |
-| arm_pl011        | √        |
-| axfs_devfs       | √        |
-| axfs_ramfs       | √        |
-| capability       | √        |
-| dw_apb_uart      | √        |
-| flatten_objects  | √        |
-| handler_table    | √        |
-| linked_list      | √        |
-| of               | √        |
-| page_table       | √        |
-| percpu           | √        |
-| percpu_macros    | √        |
-| ratio            | √        |
-| scheduler        | √        |
-| timer_list       | √        |
-| tuple_for_each   | √        |
-| axconfig         | ✘        |
-| axdisplay        | ✘        |
-| axdriver         | ✘        |
-| axfs             | ✘        |
-| axhal            | ✘        |
-| axmem            | ✘        |
-| axnet            | ✘        |
-| axprocess        | ✘        |
-| axruntime        | ✘        |
-| axsignal         | ✘        |
-| axsync           | ✘        |
-| axtask           | ✘        |
+| Crate 名称                                | 是否完成 |
+| ----------------------------------------- | -------- |
+| axerror                                   | ✓        |
+| axiohttps://github.com/xushanpu123/Starry | ✓        |
+| driver_pci                                | ✓        |
+| driver_common                             | ✓        |
+| driver_block                              | ✓        |
+| driver_net                                | ✓        |
+| driver_display                            | ✓        |
+| driver_virtio                             | ✓        |
+| slab_allocator                            | ✓        |
+| allocator                                 | ✓        |
+| axfs_vfs                                  | ✓        |
+| memory_addr                               | ✓        |
+| kernel_guard                              | ✓        |
+| spinlock                                  | ✓        |
+| page_table_entry                          | ✓        |
+| axlog                                     | ✓        |
+| crate_interface                           | ✓        |
+| axalloc                                   | ✓        |
+| lazy_init                                 | ✓        |
+| arm_gic                                   | √        |
+| arm_pl011                                 | √        |
+| axfs_devfs                                | √        |
+| axfs_ramfs                                | √        |
+| capability                                | √        |
+| dw_apb_uart                               | √        |
+| flatten_objects                           | √        |
+| handler_table                             | √        |
+| linked_list                               | √        |
+| of                                        | √        |
+| page_table                                | √        |
+| percpu                                    | √        |
+| percpu_macros                             | √        |
+| ratio                                     | √        |
+| scheduler                                 | √        |
+| timer_list                                | √        |
+| tuple_for_each                            | √        |
+| axconfig                                  | ✘        |
+| axdisplay                                 | ✘        |
+| axdriver                                  | ✘        |
+| axfs                                      | ✘        |
+| axhal                                     | ✘        |
+| axmem                                     | ✘        |
+| axnet                                     | ✘        |
+| axprocess                                 | ✘        |
+| axruntime                                 | ✘        |
+| axsignal                                  | ✘        |
+| axsync                                    | ✘        |
+| axtask                                    | ✘        |
 
 ## 2024/04/17
 
