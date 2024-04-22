@@ -1,3 +1,7 @@
+## 2024/04/22
+
+拆分出了一个基于arceos的最小可运行模块hellotest,链接为https://github.com/Arceos-crates/hellotest.git，运行方法见readme。
+
 ## 2024/04/21
 
 完成了所有模块的拆分，只留下helloworld作为初始启动的模块。
