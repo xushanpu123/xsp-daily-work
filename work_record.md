@@ -1,3 +1,7 @@
+## 2024/04/23
+
+上午研究了一下贾爷写的CI，下午痛风发作了请了个假，没什么进度，明天开始动手写。
+
 ## 2024/04/22
 
 拆分出了一个基于arceos的最小可运行模块hellotest,链接为https://github.com/Arceos-crates/hellotest.git，运行方法见readme。
