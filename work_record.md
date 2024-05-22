@@ -1,3 +1,94 @@
+## 2020/05/21
+
+继续做ch9的四种架构支持，未完成，找杨金博讨论了一下去除riscv的方法，但是还没除完。
+
+## 2020/05/20
+
+继续做ch9的四种架构支持，未完成
+
+## 2020/05/19
+
+在杨金博的帮助下发现了x86_64报segmentfault的原因，发现了rcore_tutorial关于mmap映射的bug，解决该问题。
+
+## 2020/05/18
+
+尝试解决x86_64报segmentfault的问题失败
+
+## 2020/05/17
+
+做ch9的多架构支持，但是x86_64一直报segmentfault，其它架构可以出usershell。
+
+## 2020/05/16
+
+继续支持基于polyhal的ch8的四种架构，其中x86_64报segmentfault,loongaich64和aarch64的adder测例无法通过
+
+## 2020/05/15
+
+支持基于polyhal的ch8的四种架构，未完成
+
+## 2020/05/14
+
+想不起来具体做了啥
+
+## 2020/05/13
+
+写整个工作的相关文档
+
+## 2020/05/12
+
+和胡志文一起完成了基于polyhal的ch9基于riscv64的支持，我完成其中的关于地址空间的修改
+
+## 2020/05/11
+
+继续做ch9的支持，想不起来具体做了什么工作
+
+## 2020/05/10
+
+开始做ch9的支持，没有做完，想不起来具体做了啥
+
+## 2020/05/09
+
+啥也没干
+
+## 2020/05/08
+
+想不起来干了啥
+
+## 2020/05/07
+
+移植了基于polyhal的rcore-tutorial ch6，四种架构
+
+## 2020/05/06
+
+移植了基于polyhal的rcore-tutorial ch3，riscv
+
+## 2020/05/05
+
+移植了基于polyhal的rcore-tutorial ch2，四种架构
+
+## 2020/05/04
+
+移植了基于polyhal的rcore-tutorial ch2，支持三种架构riscv64,aarch64,loongarch64，x86有segmentfault bug
+
+## 2020/05/03
+
+移植了基于polyhal的rcore-tutorial ch2，riscv64
+
+## 2020/05/02
+
+移植了基于polyhal的rcore-tutorial ch1，四种架构
+
+## 2020/05/01
+
+移植了基于polyhal的rcore-tutorial ch1，riscv
+
+## 2020/04/31
+
+完成了udpserver、bwbench、httpclient、echoserver、tls、priority、parellel、sleep的CI和模块化。
+
+## 2020/04/30
+
+完成了memtest，exception，task/yield的CI，其中出现了与log有关的bug，因为log的“0.4.21”版本支持macro_use的宏定义时会出现未知bug，所以修改了axtask模块中的macro_use,将所有的宏都加了log::，更好的解决方案应该是锁定log为低版本，但没有找到方法。
 ## 2024/04/23
 
 上午研究了一下贾爷写的CI，下午痛风发作了请了个假，没什么进度，明天开始动手写。
