@@ -1,92 +1,172 @@
-## 2020/05/21
+## 2024/05/23
+
+修复了两处bug：
+
+1、由于没有设置user/.cargo/config.toml中的x86_64编译设置，所以并没有让DISCARD debug相关段的设定生效，导致initproc过大无法在文件系统中装入；
+
+2、把启动参数设计成：
+
+```
+-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+```
+
+会在init gpu时卡死，但是去掉bus=virtio-mmio-bus.0后恢复正常，原因未知。
+
+
+
+学习了virtio中使用pci总线和控制各设备的方法：
+
+首先需要在qemu启动时使用参数：
+
+```
+-device virtio-gpu-pci -vga none \
+-device virtio-blk-pci,drive=x0 -drive file=$(img),if=none,format=raw,id=x0 \
+-device virtio-net-pci,netdev=net0 -netdev user,id=net0,hostfwd=tcp::5555-:5555
+```
+
+接下来分析了控制设备的方法：
+
+```rust
+fn enumerate_pci(mmconfig_base: *mut u8) {
+    info!("mmconfig_base = {:#x}", mmconfig_base as usize);
+
+    let mut pci_root = unsafe { PciRoot::new(mmconfig_base, Cam::Ecam) };
+    for (device_function, info) in pci_root.enumerate_bus(0) {
+        let (status, command) = pci_root.get_status_command(device_function);
+        info!(
+            "Found {} at {}, status {:?} command {:?}",
+            info, device_function, status, command
+        );
+        if let Some(virtio_type) = virtio_device_type(&info) {
+            info!("  VirtIO {:?}", virtio_type);
+
+            // Enable the device to use its BARs.
+            pci_root.set_command(
+                device_function,
+                Command::IO_SPACE | Command::MEMORY_SPACE | Command::BUS_MASTER,
+            );
+            dump_bar_contents(&mut pci_root, device_function, 4);
+
+            let mut transport =
+                PciTransport::new::<HalImpl>(&mut pci_root, device_function).unwrap();
+            info!(
+                "Detected virtio PCI device with device type {:?}, features {:#018x}",
+                transport.device_type(),
+                transport.read_device_features(),
+            );
+            virtio_device(transport);
+        }
+    }
+}
+```
+
+重点是利用virtio_type的比对可以获取到pci总线上对应类型的物理设备，然后获取到transport值，利用这个值可以新建一个对应的抽象设备来管理对应的物理设备：
+
+```rust
+let mut blk = VirtIOBlk::<HalImpl, T>::new(transport).expect("failed to create blk driver");
+
+let mut gpu = VirtIOGpu::<HalImpl, T>::new(transport).expect("failed to create gpu driver"); 
+
+let mut net =virtio_drivers::device::net::VirtIONetRaw::<HalImpl, T,NET_QUEUE_SIZE>::new(transport) .expect("failed to create net driver");
+```
+
+随后就可以用virtio-drivers提供的抽象设备接口控制各种设备了。
+
+
+
+## 2024/05/22
+
+补齐了前面的日志，修复了makefile中找不到gpu等设备的bug
+
+## 2024/05/21
 
 继续做ch9的四种架构支持，未完成，找杨金博讨论了一下去除riscv的方法，但是还没除完。
 
-## 2020/05/20
+## 2024/05/20
 
 继续做ch9的四种架构支持，未完成
 
-## 2020/05/19
+## 2024/05/19
 
 在杨金博的帮助下发现了x86_64报segmentfault的原因，发现了rcore_tutorial关于mmap映射的bug，解决该问题。
 
-## 2020/05/18
+## 2024/05/18
 
 尝试解决x86_64报segmentfault的问题失败
 
-## 2020/05/17
+## 2024/05/17
 
 做ch9的多架构支持，但是x86_64一直报segmentfault，其它架构可以出usershell。
 
-## 2020/05/16
+## 2024/05/16
 
 继续支持基于polyhal的ch8的四种架构，其中x86_64报segmentfault,loongaich64和aarch64的adder测例无法通过
 
-## 2020/05/15
+## 2024/05/15
 
 支持基于polyhal的ch8的四种架构，未完成
 
-## 2020/05/14
+## 2024/05/14
 
 想不起来具体做了啥
 
-## 2020/05/13
+## 2024/05/13
 
 写整个工作的相关文档
 
-## 2020/05/12
+## 2024/05/12
 
 和胡志文一起完成了基于polyhal的ch9基于riscv64的支持，我完成其中的关于地址空间的修改
 
-## 2020/05/11
+## 2024/05/11
 
 继续做ch9的支持，想不起来具体做了什么工作
 
-## 2020/05/10
+## 2024/05/10
 
 开始做ch9的支持，没有做完，想不起来具体做了啥
 
-## 2020/05/09
+## 2024/05/09
 
 啥也没干
 
-## 2020/05/08
+## 2024/05/08
 
 想不起来干了啥
 
-## 2020/05/07
+## 2024/05/07
 
 移植了基于polyhal的rcore-tutorial ch6，四种架构
 
-## 2020/05/06
+## 2024/05/06
 
 移植了基于polyhal的rcore-tutorial ch3，riscv
 
-## 2020/05/05
+## 2024/05/05
 
 移植了基于polyhal的rcore-tutorial ch2，四种架构
 
-## 2020/05/04
+## 2024/05/04
 
 移植了基于polyhal的rcore-tutorial ch2，支持三种架构riscv64,aarch64,loongarch64，x86有segmentfault bug
 
-## 2020/05/03
+## 2024/05/03
 
 移植了基于polyhal的rcore-tutorial ch2，riscv64
 
-## 2020/05/02
+## 2024/05/02
 
 移植了基于polyhal的rcore-tutorial ch1，四种架构
 
-## 2020/05/01
+## 2024/05/01
 
 移植了基于polyhal的rcore-tutorial ch1，riscv
 
-## 2020/04/31
+## 2024/04/31
 
 完成了udpserver、bwbench、httpclient、echoserver、tls、priority、parellel、sleep的CI和模块化。
 
-## 2020/04/30
+## 2024/04/30
 
 完成了memtest，exception，task/yield的CI，其中出现了与log有关的bug，因为log的“0.4.21”版本支持macro_use的宏定义时会出现未知bug，所以修改了axtask模块中的macro_use,将所有的宏都加了log::，更好的解决方案应该是锁定log为低版本，但没有找到方法。
 ## 2024/04/23
